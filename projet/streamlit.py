@@ -1,6 +1,4 @@
-import requests
 import pandas as pd
-import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import streamlit as st
@@ -27,7 +25,7 @@ def get_population(country_name):
 
 date_aujourdhui = datetime.date.today()
 st.set_option('deprecation.showPyplotGlobalUse', False)
-menu = ["ACCUEIL", "REFRESH DATA", "MAP"]
+menu = ["ACCUEIL", "REFRESH DATA", "MAP", "PREDICTION"]
 choice = st.sidebar.selectbox("Menu", menu)
 df_country = pd.read_csv("ISO_lat_long.csv")
 repertoire_courant = os.getcwd()
@@ -105,6 +103,18 @@ if choice == "MAP":
 
     st_folium(m, width=725, height=500)
 
+    # Widget pour la barre de recherche
+    search_query = st.text_input('Rechercher un pays')
+
+    # Filtrer le dataframe en fonction de la saisie de l'utilisateur
+    filtered_df = df_filtered[df_filtered['Country'].str.contains(search_query, case=False)]
+
+    # Afficher la population du pays filtré
+    if not filtered_df.empty:
+        st.write(f"Population de {filtered_df.iloc[0]['Country']}: {filtered_df.iloc[0]['Population']}")
+    else:
+        st.write("Aucun pays correspondant à la recherche")
+
     # Graphique à barres des 10 pays les plus peuplés
     plt.subplot(2, 2, 1)
     top_10 = df_filtered.nlargest(10, 'Population')
@@ -124,3 +134,73 @@ if choice == "MAP":
 
     # Afficher le graphique
     st.pyplot()
+
+if choice == "PREDICTION":
+    # Chemin vers le dossier contenant les fichiers CSV
+    dossier = 'database_predict/'
+
+    # Liste pour stocker les données de tous les fichiers CSV
+    donnees_totales = []
+
+    # Parcours de tous les fichiers dans le dossier
+    for fichier in os.listdir(dossier):
+        if fichier.endswith('.csv'):
+            chemin_fichier = os.path.join(dossier, fichier)
+            # Lecture du fichier CSV et ajout des données à la liste
+            donnees = pd.read_csv(chemin_fichier)
+            donnees_totales.append(donnees)
+
+    # Concaténation de toutes les données en un seul DataFrame
+    merged_df_clean = pd.concat(donnees_totales, ignore_index=True)
+
+    # Trier les dates en ordre décroissant pour que la plus récente soit en premier
+    liste_dates = sorted(merged_df_clean['date'].unique(), reverse=True)
+
+    # Sélectionner par défaut la date la plus récente
+    date_selectionnee = st.selectbox('Sélectionner une date', liste_dates, index=0)
+
+    # Filtrer les données en fonction de la date sélectionnée
+    df_filtered = merged_df_clean[merged_df_clean['date'] == date_selectionnee]
+
+    st.write(f"Carte de la démographie en {date_selectionnee}")
+    m = folium.Map(location=[48, 5], zoom_start=4)
+
+    marker_cluster = MarkerCluster().add_to(m)
+    for index, row in df_filtered.iterrows():
+        print(row['Latitude_x'], row['Longitude_x'], row['Country'])
+        folium.Marker(location=[row['Latitude_x'], row['Longitude_x']],
+                      popup=f"{row['Country']} - {row['predictions']} habitants").add_to(marker_cluster)
+
+    st_folium(m, width=725, height=500)
+
+    # Widget pour la barre de recherche
+    search_query = st.text_input('Rechercher un pays')
+
+    # Filtrer le dataframe en fonction de la saisie de l'utilisateur
+    filtered_df = df_filtered[df_filtered['Country'].str.contains(search_query, case=False)]
+
+    # Afficher la population du pays filtré
+    if not filtered_df.empty:
+        st.write(f"Population de {filtered_df.iloc[0]['Country']}: {filtered_df.iloc[0]['predictions']}")
+    else:
+        st.write("Aucun pays correspondant à la recherche")
+
+
+    # # Graphique à barres des 10 pays les plus peuplés
+    # plt.subplot(2, 2, 1)
+    # top_10 = df_filtered.nlargest(10, 'predictions')
+    # sns.barplot(x='predictions', y='Country', data=top_10,
+    #             palette='viridis')
+    # plt.title('Top 10 des pays les plus peuplés')
+    # st.pyplot()
+    #
+    # labels = top_10['Country']
+    # sizes = top_10['predictions']
+    #
+    # # Créer le graphique camembert
+    # plt.figure(figsize=(8, 8))
+    # plt.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=140)
+    # plt.title('Répartition de la population parmi les 10 pays les plus peuplés')
+    #
+    # # Afficher le graphique
+    # st.pyplot()
